@@ -175,6 +175,7 @@ export default function DashboardLayout({ children }) {
                 <Menu className="w-6 h-6" />
               </button>
             </div>
+            
 
             <div className="flex items-center gap-4">
               {/* Search */}
@@ -195,15 +196,8 @@ export default function DashboardLayout({ children }) {
                 </span>
               </button>
 
-              {/* User Menu */}
-              <div className="flex items-center gap-2">
-                <div className="bg-mvk-100 w-8 h-8 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-mvk-600" />
-                </div>
-                <span className="hidden sm:block font-medium text-gray-900">
-                  {userData?.nome?.split(' ')[0]}
-                </span>
-              </div>
+           
+
             </div>
           </div>
         </header>

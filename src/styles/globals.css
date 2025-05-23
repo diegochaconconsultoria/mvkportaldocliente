@@ -99,8 +99,26 @@ a {
 }
 
 /* Dark mode (para implementação futura) */
-@media (prefers-color-scheme: dark) {
+/*@media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
   }
+}*/
+
+input,
+textarea,
+select {
+  background-color: #f9fafb; /* Cinza claro sempre */
+  color: #111827; /* Texto preto sempre */
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  background-color: #ffffff; /* Branco no foco */
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
 }
