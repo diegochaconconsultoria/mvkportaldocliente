@@ -11,8 +11,7 @@ import {
   CreditCard, 
   MessageCircle, 
   LogOut,
-  Bell,
-  Search
+  Lock
 } from 'lucide-react';
 import { auth } from '@/lib/auth';
 
@@ -20,6 +19,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [userData, setUserData] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   useEffect(() => {
     // Verificar autenticação
@@ -89,41 +89,41 @@ export default function DashboardLayout({ children }) {
       {/* Sidebar - FIXA COM CONTEÚDO FIXO */}
       <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0`}>
         {/* Header da Sidebar - FIXO */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 gradient-mvk">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/logomvk.png"
-              alt="Logo MVK"
-              width={32}
-              height={24}
-              className="bg-white rounded p-1"
-            />
-            <span className="font-semibold text-white">Portal MVK</span>
-          </div>
+        <div className="flex items-center justify-center h-16 px-6 border-b border-gray-200 gradient-mvk">
+          <img
+            src="/logomvk.png"
+            alt="Logo MVK"
+            style={{
+              width: '1000px',
+              height: '55px',
+              objectFit: 'contain',
+            
+              borderRadius: '8px',
+              padding: '4px'
+            }}
+            onError={(e) => {
+              e.target.style.display = 'none';
+              const fallback = document.createElement('div');
+              fallback.style.cssText = 'width: 80px; height: 40px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #9f2441; font-size: 14px;';
+              fallback.textContent = 'MVK';
+              e.target.parentNode.appendChild(fallback);
+            }}
+          />
+
+          {/* Botão X só para mobile */}
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-white hover:text-mvk-200"
+            className="lg:hidden absolute right-4 text-white hover:text-mvk-200"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* User Info - FIXO */}
-        <div className="p-6 border-b border-gray-200 bg-mvk-50">
-          <div className="flex items-center gap-3">
-            <div className="bg-mvk-100 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
-              <User className="w-6 h-6 text-mvk-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-mvk-900 text-sm leading-tight break-words">{userData?.nome}</p>
-              <p className="text-xs text-mvk-600 truncate mt-1">{userData?.email}</p>
-            </div>
-          </div>
-        </div>
+        {/* User Info - REMOVIDO */}
 
         {/* Navigation - FIXO com scroll interno se necessário */}
         <div className="flex-1 overflow-y-auto">
-          <nav className="p-4 space-y-2">
+          <nav className="p-4 space-y-2 border-t border-gray-200">
             {menuItems.map((item) => {
               const isActive = router.pathname === item.href;
               return (
@@ -142,14 +142,7 @@ export default function DashboardLayout({ children }) {
               );
             })}
             
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-red-600 rounded-lg hover:bg-red-50 transition-colors group mt-8"
-            >
-              <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              <span className="font-medium">Sair</span>
-            </button>
+
           </nav>
         </div>
       </aside>
@@ -166,44 +159,104 @@ export default function DashboardLayout({ children }) {
       <div className="flex-1 lg:ml-64">
         {/* Header - FIXO */}
         <header className="bg-white shadow-sm border-b border-gray-200 fixed top-0 right-0 left-0 lg:left-64 z-30">
-          <div className="flex items-center justify-between h-16 px-6">
-            <div className="flex items-center gap-4">
+          {/* Área de boas-vindas - alinhada com o header da sidebar */}
+          <div className="bg-mvk-50 px-6 py-4 border-b border-gray-100 h-16 flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-mvk-900 leading-tight">
+                {userData?.nome}, bem-vindo ao Portal do Cliente MVK
+              </h1>
+              <p className="text-mvk-700 text-xs mt-1">
+                Aqui você pode acompanhar seus pedidos, notas fiscais e informações financeiras.
+              </p>
+            </div>
+
+            {/* Botão de Perfil */}
+            <div className="relative">
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden text-gray-500 hover:text-mvk-600"
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors"
               >
-                <Menu className="w-6 h-6" />
-              </button>
-            </div>
-            
-
-            <div className="flex items-center gap-4">
-              {/* Search */}
-              <div className="hidden sm:block relative">
-                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="Buscar..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mvk-500 focus:border-mvk-500 w-64"
-                />
-              </div>
-
-              {/* Notifications */}
-              <button className="relative p-2 text-gray-500 hover:text-mvk-600">
-                <Bell className="w-6 h-6" />
-                <span className="absolute top-0 right-0 bg-mvk-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                  3
-                </span>
+                <div className="bg-mvk-100 w-8 h-8 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-mvk-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-900">Perfil</span>
               </button>
 
-           
+              {/* Menu Dropdown do Perfil */}
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  {/* Overlay para fechar o menu */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setProfileMenuOpen(false)}
+                  ></div>
+                  
+                  <div className="relative z-50 p-6">
+                    {/* Meus Dados */}
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Meus Dados</h3>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</label>
+                          <p className="text-sm text-gray-900 mt-1">{userData?.nome}</p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Código do Cliente</label>
+                          <p className="text-sm text-gray-900 mt-1">{userData?.codigo}</p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Email de Acesso</label>
+                          <p className="text-sm text-gray-900 mt-1">{userData?.email}</p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">CNPJ</label>
+                          <p className="text-sm text-gray-900 mt-1">{userData?.cgc}</p>
+                        </div>
+                      </div>
+                    </div>
 
+                    {/* Ações */}
+                    <div className="border-t border-gray-200 pt-4 space-y-2">
+                      <button className="w-full flex items-center gap-3 px-3 py-3 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors group">
+                        <div className="bg-blue-100 p-2 rounded-full group-hover:bg-blue-200 transition-colors">
+                          <Lock className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <span className="font-medium">Trocar Senha</span>
+                      </button>
+                      
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-3 py-3 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
+                      >
+                        <div className="bg-red-100 p-2 rounded-full group-hover:bg-red-200 transition-colors">
+                          <LogOut className="w-4 h-4 text-red-600" />
+                        </div>
+                        <span className="font-medium">Sair</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Barra de ações - só o menu mobile se necessário */}
+          <div className="lg:hidden flex items-center h-12 px-6 bg-white">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="text-gray-500 hover:text-mvk-600"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
           </div>
         </header>
 
-        {/* Main Content - Com padding-top para compensar header fixo */}
-        <main className="pt-16 p-6 min-h-screen">
+        {/* Main Content - Com padding-top aumentado para mais espaçamento */}
+        <main className="pt-24 lg:pt-24 p-6 min-h-screen">
           {children}
         </main>
       </div>

@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { 
   ArrowLeft, 
   Search, 
-  Filter, 
   Download, 
   Eye,
   FileText,
   Calendar,
   DollarSign,
-  CheckCircle
+  AlertCircle,
+  Loader
 } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { formatters } from '@/lib/utils';
@@ -19,59 +19,19 @@ import DashboardLayout from '@/components/DashboardLayout';
 
 export default function NotasFiscais() {
   const router = useRouter();
-  const [notasFiscais, setNotasFiscais] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos');
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [notas, setNotas] = useState([]);
+  const [error, setError] = useState('');
+  const [loadingNF, setLoadingNF] = useState({});
 
-  // Dados mock - substituir por API real
-  const notasFiscaisMock = [
-    {
-      numero: 'NF-001234',
-      data: '2024-05-19',
-      valor: 2500.00,
-      status: 'Emitida',
-      chaveNfe: '35240512345678000100550010001234561123456789',
-      vencimento: '2024-06-19',
-      arquivo: 'nf-001234.pdf'
-    },
-    {
-      numero: 'NF-001235',
-      data: '2024-05-17',
-      valor: 1800.50,
-      status: 'Enviada',
-      chaveNfe: '35240512345678000100550010001235671234567890',
-      vencimento: '2024-06-17',
-      arquivo: 'nf-001235.pdf'
-    },
-    {
-      numero: 'NF-001236',
-      data: '2024-05-15',
-      valor: 3200.00,
-      status: 'Processando',
-      chaveNfe: '35240512345678000100550010001236781234567891',
-      vencimento: '2024-06-15',
-      arquivo: null
-    },
-    {
-      numero: 'NF-001237',
-      data: '2024-05-12',
-      valor: 950.75,
-      status: 'Cancelada',
-      chaveNfe: '35240512345678000100550010001237891234567892',
-      vencimento: '',
-      arquivo: null
-    },
-    {
-      numero: 'NF-001238',
-      data: '2024-05-10',
-      valor: 4100.00,
-      status: 'Emitida',
-      chaveNfe: '35240512345678000100550010001238901234567893',
-      vencimento: '2024-06-10',
-      arquivo: 'nf-001238.pdf'
-    }
-  ];
+  // Estados dos filtros
+  const [filtros, setFiltros] = useState({
+    todos: true,
+    dataDe: '',
+    dataAte: '',
+    numeroNota: ''
+  });
 
   useEffect(() => {
     // Verificar autenticação
@@ -80,51 +40,175 @@ export default function NotasFiscais() {
       return;
     }
 
-    // Simular carregamento de dados
-    setTimeout(() => {
-      setNotasFiscais(notasFiscaisMock);
-      setLoading(false);
-    }, 1000);
+    // Carregar dados do usuário
+    const user = auth.getUserData();
+    setUserData(user);
   }, [router]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Emitida':
-        return 'bg-green-100 text-green-800';
-      case 'Enviada':
-        return 'bg-blue-100 text-blue-800';
-      case 'Processando':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Cancelada':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  // Função para formatar data para AAAAMMDD
+  const formatDateToAPI = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  };
+
+  // Função para formatar data da API (AAAAMMDD) para exibição (DD/MM/AAAA)
+  const formatDateFromAPI = (dateString) => {
+    if (!dateString || dateString === 'Nota nao encontrada') return '-';
+    if (dateString.length !== 8) return dateString;
+    
+    const year = dateString.substring(0, 4);
+    const month = dateString.substring(4, 6);
+    const day = dateString.substring(6, 8);
+    return `${day}/${month}/${year}`;
+  };
+
+  // Função para download da Nota Fiscal
+  const baixarNotaFiscal = async (chaveAcesso, index) => {
+    setLoadingNF(prev => ({ ...prev, [index]: true }));
+
+    try {
+      const requestData = {
+        chaveacesso: chaveAcesso
+      };
+
+      console.log('Buscando PDF da Nota Fiscal:', requestData);
+
+      // Preparar headers com Basic Auth
+      const authString = btoa('admin:msmvk');
+      
+      const response = await fetch('https://192.168.0.251:8410/rest/VKPCLIPNF', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authString}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro na comunicação: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Resposta da API NF:', result);
+
+      if (result.PDF64) {
+        // Converter base64 para blob
+        const binaryString = atob(result.PDF64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        
+        // Criar URL para download
+        const url = window.URL.createObjectURL(blob);
+        
+        // Criar elemento de download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Nota_Fiscal_${chaveAcesso.substring(0, 8)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Limpar
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        console.log('Download da NF realizado com sucesso');
+      } else {
+        throw new Error('PDF não encontrado na resposta da API');
+      }
+
+    } catch (err) {
+      console.error('Erro ao baixar nota fiscal:', err);
+      alert(`Erro ao baixar nota fiscal: ${err.message}`);
+    } finally {
+      setLoadingNF(prev => ({ ...prev, [index]: false }));
     }
   };
 
-  const filteredNotas = notasFiscais.filter(nota => {
-    const matchesSearch = nota.numero.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'todos' || nota.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Função para buscar notas fiscais na API
+  const buscarNotas = async () => {
+    if (!userData?.codigo) {
+      setError('Código do cliente não encontrado. Faça login novamente.');
+      return;
+    }
 
-  const handleDownload = (arquivo) => {
-    // Simular download - implementar com URL real da API
-    alert(`Download do arquivo: ${arquivo}`);
+    setLoading(true);
+    setError('');
+    setNotas([]);
+
+    try {
+      // Preparar dados para a API
+      const requestData = {
+        Todos: filtros.todos ? 'Sim' : 'Nao',
+        CodigoCliente: userData.codigo,
+        Nota: filtros.todos ? '' : filtros.numeroNota,
+        DataDe: filtros.todos ? '' : formatDateToAPI(filtros.dataDe),
+        DataAte: filtros.todos ? '' : formatDateToAPI(filtros.dataAte)
+      };
+
+      console.log('Enviando para API:', requestData);
+
+      // Preparar headers com Basic Auth
+      const authString = btoa('admin:msmvk');
+      
+      const response = await fetch('https://192.168.0.251:8410/rest/VKPCLILNF', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authString}`
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro na comunicação: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Resposta da API:', result);
+
+      if (result.success) {
+        setNotas(result.Notas || []);
+        if (result.Notas && result.Notas.length === 0) {
+          setError('Nenhuma nota fiscal encontrada com os filtros selecionados.');
+        }
+      } else {
+        setError('Nenhuma nota fiscal encontrada com os filtros selecionados.');
+        setNotas(result.Notas || []);
+      }
+
+    } catch (err) {
+      console.error('Erro ao buscar notas fiscais:', err);
+      setError(`Erro ao buscar notas fiscais: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Carregando notas fiscais...</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // Atualizar filtros
+  const updateFiltro = (campo, valor) => {
+    setFiltros(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  // Verificar se há erro nos dados retornados
+  const hasError = notas.some(n => n.Numero === 'Nota nao encontrada');
+
+  // Calcular estatísticas
+  const estatisticas = {
+    totalNotas: hasError ? 0 : notas.length,
+    valorTotal: hasError ? 0 : notas.reduce((sum, n) => sum + (parseFloat(n.ValorNF) || 0), 0)
+  };
 
   return (
     <>
@@ -134,202 +218,273 @@ export default function NotasFiscais() {
       </Head>
 
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-full overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/dashboard"
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                Voltar
-              </Link>
-              <div>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-gray-900">Notas Fiscais</h1>
                 <p className="text-gray-600">Consulte e baixe suas notas fiscais</p>
               </div>
             </div>
             
-            <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={() => {
+                if (notas.length > 0 && !hasError) {
+                  alert('Exportando lista de notas fiscais...');
+                }
+              }}
+              disabled={notas.length === 0 || hasError}
+              className="flex items-center gap-2 bg-mvk-600 text-white px-4 py-2 rounded-lg hover:bg-mvk-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            >
               <Download className="w-4 h-4" />
-              Exportar Lista
+              Exportar
             </button>
           </div>
 
-          {/* Filters */}
+          {/* Filtros */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="Buscar por número da nota fiscal..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtros de Pesquisa</h3>
+            
+            <div className="space-y-4">
+              {/* Toggle Todos */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className="flex items-center cursor-pointer">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={filtros.todos}
+                      onChange={(e) => updateFiltro('todos', e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-12 h-6 rounded-full transition-colors ${
+                      filtros.todos ? 'bg-mvk-600' : 'bg-gray-300'
+                    }`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+                        filtros.todos ? 'translate-x-6' : 'translate-x-0.5'
+                      } mt-0.5`}></div>
+                    </div>
+                  </div>
+                  <span className="ml-3 font-medium text-gray-900">
+                    Todas as notas fiscais
+                  </span>
+                </label>
+                <span className="text-sm text-gray-500">
+                  (Se ativado, ignora os filtros abaixo)
+                </span>
               </div>
 
-              {/* Status Filter */}
-              <div className="relative">
-                <Filter className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              {/* Filtros específicos */}
+              <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${
+                filtros.todos ? 'opacity-40' : 'opacity-100'
+              }`}>
+                {/* Data De */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
+                    Data De
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.dataDe}
+                    onChange={(e) => updateFiltro('dataDe', e.target.value)}
+                    disabled={filtros.todos}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mvk-500 focus:border-mvk-500 disabled:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+                  />
+                </div>
+
+                {/* Data Até */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
+                    Data Até
+                  </label>
+                  <input
+                    type="date"
+                    value={filtros.dataAte}
+                    onChange={(e) => updateFiltro('dataAte', e.target.value)}
+                    disabled={filtros.todos}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mvk-500 focus:border-mvk-500 disabled:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+                  />
+                </div>
+
+                {/* Número da Nota Fiscal */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
+                    Número da Nota Fiscal
+                  </label>
+                  <input
+                    type="text"
+                    value={filtros.numeroNota}
+                    onChange={(e) => updateFiltro('numeroNota', e.target.value)}
+                    disabled={filtros.todos}
+                    placeholder="Ex: 1345798"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mvk-500 focus:border-mvk-500 disabled:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+                  />
+                </div>
+              </div>
+
+              {/* Botão Buscar */}
+              <div className="flex justify-end pt-4">
+                <button
+                  onClick={buscarNotas}
+                  disabled={loading}
+                  className="flex items-center gap-2 bg-mvk-600 text-white px-6 py-2 rounded-lg hover:bg-mvk-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="todos">Todos os status</option>
-                  <option value="Processando">Processando</option>
-                  <option value="Emitida">Emitida</option>
-                  <option value="Enviada">Enviada</option>
-                  <option value="Cancelada">Cancelada</option>
-                </select>
+                  {loading ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Buscando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      Buscar
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total de Notas</p>
-                  <p className="text-2xl font-bold text-gray-900">{notasFiscais.length}</p>
+          {/* Mensagem de erro */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <span className="text-red-700">{error}</span>
+            </div>
+          )}
+
+          {/* Estatísticas */}
+          {notas.length > 0 && !hasError && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total de Notas</p>
+                    <p className="text-2xl font-bold text-gray-900">{estatisticas.totalNotas}</p>
+                  </div>
+                  <FileText className="w-8 h-8 text-mvk-600" />
                 </div>
-                <FileText className="w-8 h-8 text-blue-600" />
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatters.currency(estatisticas.valorTotal)}
+                    </p>
+                  </div>
+                  <DollarSign className="w-8 h-8 text-mvk-600" />
+                </div>
               </div>
             </div>
+          )}
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Emitidas</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {notasFiscais.filter(n => n.status === 'Emitida').length}
-                  </p>
-                </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
+          {/* Lista de Notas Fiscais */}
+          {notas.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {hasError ? 'Resultado da Busca' : `Notas Fiscais Encontradas (${notas.length})`}
+                </h3>
               </div>
-            </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Processando</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {notasFiscais.filter(n => n.status === 'Processando').length}
-                  </p>
-                </div>
-                <Calendar className="w-8 h-8 text-yellow-600" />
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Valor Total</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatters.currency(notasFiscais.reduce((sum, n) => sum + n.valor, 0))}
-                  </p>
-                </div>
-                <DollarSign className="w-8 h-8 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Notas Fiscais List */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Suas Notas Fiscais ({filteredNotas.length})
-              </h3>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Número
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data Emissão
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vencimento
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredNotas.map((nota) => (
-                    <tr key={nota.numero} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{nota.numero}</div>
-                          <div className="text-xs text-gray-500 truncate w-32">{nota.chaveNfe}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatters.date(nota.data)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatters.currency(nota.valor)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(nota.status)}`}>
-                          {nota.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {nota.vencimento ? formatters.date(nota.vencimento) : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center gap-2 justify-end">
-                          <button className="text-blue-600 hover:text-blue-900 flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            Ver
-                          </button>
-                          {nota.arquivo && (
-                            <button 
-                              onClick={() => handleDownload(nota.arquivo)}
-                              className="text-green-600 hover:text-green-900 flex items-center gap-1"
-                            >
-                              <Download className="w-4 h-4" />
-                              PDF
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {filteredNotas.length === 0 && (
-                <div className="text-center py-12">
+              {hasError ? (
+                <div className="p-12 text-center">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma nota fiscal encontrada</h3>
                   <p className="text-gray-600">
-                    {searchTerm || statusFilter !== 'todos' 
-                      ? 'Tente ajustar os filtros de busca'
-                      : 'Você ainda não possui notas fiscais cadastradas'
-                    }
+                    Não foram encontradas notas fiscais com os filtros especificados.
+                    Tente ajustar os critérios de busca.
                   </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full table-fixed">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Número
+                        </th>
+                        <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Data Emissão
+                        </th>
+                        <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Valor
+                        </th>
+                        <th className="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Operação
+                        </th>
+                        <th className="w-48 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Chave NFe
+                        </th>
+                        <th className="w-32 px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {notas.map((nota, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap truncate">
+                            <div className="text-sm font-medium text-gray-900">#{nota.Numero}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDateFromAPI(nota.Emissao)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {nota.ValorNF && !isNaN(nota.ValorNF) ? formatters.currency(parseFloat(nota.ValorNF)) : nota.ValorNF}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            <div className="truncate" title={nota.Operacao}>
+                              {nota.Operacao}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <div className="truncate font-mono text-xs" title={nota.chavenf}>
+                              {nota.chavenf}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            {nota.chavenf && nota.chavenf !== 'Nota nao encontrada' && (
+                              <button 
+                                onClick={() => baixarNotaFiscal(nota.chavenf, index)}
+                                disabled={loadingNF[index]}
+                                className="flex items-center gap-1 text-mvk-600 hover:text-mvk-900 ml-auto bg-mvk-50 px-3 py-1 rounded-lg hover:bg-mvk-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {loadingNF[index] ? (
+                                  <>
+                                    <Loader className="w-4 h-4 animate-spin" />
+                                    Baixando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="w-4 h-4" />
+                                    Baixar NF
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
-          </div>
+          )}
+
+          {/* Estado inicial - nenhuma busca realizada */}
+          {notas.length === 0 && !loading && !error && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Buscar Notas Fiscais</h3>
+              <p className="text-gray-600">
+                Configure os filtros acima e clique em "Buscar" para consultar suas notas fiscais.
+              </p>
+            </div>
+          )}
         </div>
       </DashboardLayout>
     </>

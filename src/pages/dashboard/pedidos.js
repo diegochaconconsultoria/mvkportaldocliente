@@ -373,13 +373,7 @@ export default function Pedidos() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link 
-                href="/dashboard"
-                className="flex items-center gap-2 text-gray-600 hover:text-mvk-600 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                Voltar
-              </Link>
+  
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
                 <p className="text-gray-600">Consulte e acompanhe seus pedidos</p>

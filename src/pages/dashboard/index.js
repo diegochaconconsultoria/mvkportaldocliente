@@ -15,7 +15,7 @@ import { auth } from '@/lib/auth';
 import { formatters } from '@/lib/utils';
 import DashboardLayout from '@/components/DashboardLayout';
 
-export default function Home() {
+export default function Dashboard() {
   const router = useRouter();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -104,16 +104,6 @@ export default function Home() {
 
       <DashboardLayout>
         <div className="space-y-6">
-          {/* Welcome Section */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Bem-vindo, {userData?.nome?.split(' ')[0]}!
-            </h2>
-            <p className="text-gray-600">
-              Aqui você pode acompanhar seus pedidos, notas fiscais e informações financeiras.
-            </p>
-          </div>
-
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">

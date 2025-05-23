@@ -201,16 +201,15 @@ export default function Login() {
           <div className="text-center mb-8">
             <div className="mb-6">
               <Image
-                src="/logomvk.png"
+                src="/logomvklogin.png"
                 alt="Logo MVK"
-                width={120}
+                width={180}
                 height={80}
                 className="mx-auto"
                 priority
               />
             </div>
             <h1 className="text-3xl font-bold text-mvk-900 mb-2">Portal do Cliente</h1>
-            <p className="text-mvk-700">Acesse sua área exclusiva</p>
           </div>
 
           {/* Alertas */}
@@ -230,7 +229,7 @@ export default function Login() {
           {!showPrimeiroAcesso ? (
             /* Formulário de Login */
             <div className="bg-white rounded-xl shadow-lg p-8 border border-mvk-100">
-              <h2 className="text-2xl font-semibold text-mvk-900 mb-6 text-center">Entrar</h2>
+              <h2 className="text-1xl font-semibold text-mvk-900 mb-6 text-center">Entrar</h2>
               
               <div className="space-y-5">
                 {/* Campo Email */}
